@@ -1,6 +1,5 @@
 import argparse
 from importlib import import_module
-import logging
 import os
 import sys
 
@@ -24,9 +23,9 @@ def main():
                                        dest='command')
 
     parser.add_argument('-q', '--quiet', help='disable logging',
-        dest='verbosity', action='store_const', const=logging.ERROR)
+        dest='verbosity', action='store_const', const='ERROR')
     parser.add_argument('-v', '--verbose', help='print extra information',
-        dest='verbosity', action='store_const', const=logging.DEBUG)
+        dest='verbosity', action='store_const', const='DEBUG')
 
     install_parser = subparsers.add_parser('install',
         description='Install binary dependencies')
@@ -75,6 +74,11 @@ def main():
                                   action='store_true',
                                   default=False)
 
+    list_parser = subparsers.add_parser('list',
+        description='List Python versions installed in a manylinux image')
+    list_parser.add_argument('tag',
+        help='manylinux image tag (e.g. 2010_x86_64)')
+
     which_parser = subparsers.add_parser('which',
         description='Locate a binary dependency')
     which_parser.add_argument('binary', choices=binaries,
@@ -84,7 +88,8 @@ def main():
 
     # Configure the verbosity
     if args.verbosity:
-        logging.getLogger().setLevel(args.verbosity)
+        from .utils import log
+        log.set_level(args.verbosity)
 
     # check if no arguments are passed
     if args.command is None:
