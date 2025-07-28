@@ -1,23 +1,28 @@
 name: PyPI
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - 'VERSION'
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: 'Upload to PyPI'
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   Test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ['3.9']
+        version: ['3.11']
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.version }}
+
+    - name: Install Dependencies
+      run: pip install requests
 
     - name: Test local builder
       run: |
@@ -31,19 +36,18 @@ jobs:
     if: github.ref == 'refs/heads/master'
 
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-python@v1
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
+        python-version: '3.11'
 
     - name: Build wheel
       run: |
-        pip install -U pip
-        pip install -U wheel
-        python setup.py bdist_wheel --universal
+        pip install -U pip build
+        python -m build
 
     - name: Upload to PyPI
-      if: github.ref == 'refs/heads/master'
-      uses: pypa/gh-action-pypi-publish@master
+      if: (github.ref == 'refs/heads/master') && inputs.upload
+      uses: pypa/gh-action-pypi-publish@release/v1
       with:
         password: ${{ secrets.PYPI_TOKEN }}

@@ -28,9 +28,13 @@ def urlretrieve(url, filename=None):
     '''
     if filename is None:
         filename = os.path.basename(url)
-        debug('DOWNLOAD', '%s from %s', name, os.path.dirname(url))
+        debug('DOWNLOAD', '%s from %s', filename, os.path.dirname(url))
     else:
         debug('DOWNLOAD', '%s as %s', url, filename)
+
+        parent_directory = os.path.dirname(filename)
+        if parent_directory and not os.path.exists(parent_directory):
+            os.makedirs(parent_directory)
 
     if _urlretrieve is None:
         data = urllib2.urlopen(url).read()

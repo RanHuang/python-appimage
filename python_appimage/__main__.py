@@ -1,7 +1,6 @@
 import argparse
 from importlib import import_module
 import os
-import sys
 
 
 __all__ = ['main']
@@ -11,6 +10,7 @@ def exists(path):
     if not os.path.exists(path):
         raise argparse.ArgumentTypeError("could not find: {}".format(path))
     return os.path.abspath(path)
+
 
 def main():
     '''Entry point for the CLI
@@ -27,22 +27,44 @@ def main():
                                        help='Command to execute',
                                        dest='command')
 
+    parser.add_argument('-a', '--appimagetool-version',
+        help='set appimagetool version')
     parser.add_argument('-q', '--quiet', help='disable logging',
         dest='verbosity', action='store_const', const='ERROR')
     parser.add_argument('-v', '--verbose', help='print extra information',
         dest='verbosity', action='store_const', const='DEBUG')
 
+    build_parser = subparsers.add_parser('build',
+        description='Build a Python appimage')
+    build_subparsers = build_parser.add_subparsers(title='type',
+        help='Type of AppImage build', dest='sub_command')
+
+    cache_parser = subparsers.add_parser('cache',
+        description='Manage Python appimage cache')
+    cache_subparsers = cache_parser.add_subparsers(title='operation',
+        help='Type of cache operation', dest='sub_command')
+
+    cache_clean_parser = cache_subparsers.add_parser('clean',
+        description='Clean cached image(s)')
+    cache_clean_parser.add_argument('tags', nargs='*',
+        help='manylinux image tag(s) (e.g. 2014_x86_64)')
+    cache_clean_parser.add_argument('-a', '--all', action='store_true',
+        help='remove all image(s) data')
+
+    cache_get_parser = cache_subparsers.add_parser('get',
+        description='Download image(s) to the cache')
+    cache_get_parser.add_argument('tags', nargs='+',
+        help='manylinux image tag(s) (e.g. 2014_x86_64)')
+    cache_get_parser.add_argument('-e', '--extract', action='store_true',
+        help='extract compressed image data')
+
+    cache_list_parser = cache_subparsers.add_parser('list',
+        description='List cached image(s)')
+
     install_parser = subparsers.add_parser('install',
         description='Install binary dependencies')
     install_parser.add_argument('binary', nargs='+',
         choices=binaries, help='one or more binary name')
-
-    build_parser = subparsers.add_parser('build',
-        description='Build a Python appimage')
-    build_subparsers = build_parser.add_subparsers(
-                           title='type',
-                           help='Type of AppImage build',
-                           dest='sub_command')
 
     build_local_parser = build_subparsers.add_parser('local',
         description='Bundle a local Python installation')
@@ -51,14 +73,18 @@ def main():
     build_local_parser.add_argument('-p', '--python', help='python executable')
 
     build_manylinux_parser = build_subparsers.add_parser('manylinux',
-        description='Bundle a manylinux Python installation using docker')
+        description='Bundle a manylinux Python installation')
     build_manylinux_parser.add_argument('tag',
         help='manylinux image tag (e.g. 2010_x86_64)')
     build_manylinux_parser.add_argument('abi',
         help='python ABI (e.g. cp37-cp37m)')
-
-    build_manylinux_parser.add_argument('--contained', help=argparse.SUPPRESS,
-                                        action='store_true', default=False)
+    build_manylinux_parser.add_argument('-b', '--bare',
+        help='produce a bare image without the AppImage layer',
+        action='store_true')
+    build_manylinux_parser.add_argument('-c', '--clean',
+        help='clean the cache after extraction', action='store_true')
+    build_manylinux_parser.add_argument('-n', '--no-packaging',
+        help='do not package (compress) the image', action='store_true')
 
     build_app_parser = build_subparsers.add_parser('app',
         description='Build a Python application using a base AppImage')
@@ -70,6 +96,8 @@ def main():
         help='linux compatibility tag (e.g. manylinux1_x86_64)')
     build_app_parser.add_argument('-n', '--name',
         help='application name')
+    build_app_parser.add_argument('--no-packaging',
+        help='do not package the app', action='store_true')
     build_app_parser.add_argument('--python-tag',
         help='python compatibility tag (e.g. cp37-cp37m)')
     build_app_parser.add_argument('-p', '--python-version',
@@ -98,6 +126,10 @@ def main():
         from .utils import log
         log.set_level(args.verbosity)
 
+    if args.appimagetool_version:
+        from .utils import deps
+        deps.APPIMAGETOOL_VERSION = args.appimagetool_version
+
     # check if no arguments are passed
     if args.command is None:
         parser.print_help()
@@ -121,5 +153,5 @@ def main():
     command.execute(*command._unpack_args(args))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

@@ -9,39 +9,58 @@ from .tmp import TemporaryDirectory
 from .url import urlretrieve
 
 
-__all__ = ['APPIMAGETOOL', 'EXCLUDELIST', 'PATCHELF', 'PREFIX',
-           'ensure_appimagetool', 'ensure_excludelist', 'ensure_patchelf']
-
-
 _ARCH = platform.machine()
 
+CACHE_DIR = os.path.expanduser('~/.cache/python-appimage')
+'''Package cache location'''
 
 PREFIX = os.path.abspath(os.path.dirname(__file__) + '/..')
 '''Package installation prefix'''
 
-APPIMAGETOOL = os.path.expanduser('~/.local/bin/appimagetool')
+APPIMAGETOOL_DIR = os.path.join(CACHE_DIR, 'bin')
 '''Location of the appimagetool binary'''
 
-EXCLUDELIST = PREFIX + '/data/excludelist'
+APPIMAGETOOL_VERSION = 'continuous'
+'''Version of the appimagetool binary'''
+
+EXCLUDELIST = os.path.join(CACHE_DIR, 'share/excludelist')
 '''AppImage exclusion list'''
 
-PATCHELF = os.path.expanduser('~/.local/bin/patchelf')
+PATCHELF = os.path.join(CACHE_DIR, 'bin/patchelf')
 '''Location of the PatchELF binary'''
 
+PATCHELF_VERSION = '0.14.3'
+'''Version of the patchelf binary'''
 
-def ensure_appimagetool():
+
+def ensure_appimagetool(dry=False):
     '''Fetch appimagetool from the web if not available locally
     '''
-    if os.path.exists(APPIMAGETOOL):
-        return False
 
+    if APPIMAGETOOL_VERSION == '12':
+        appimagetool_name = 'appimagetool'
+    else:
+        appimagetool_name = 'appimagetool-' + APPIMAGETOOL_VERSION
+    appdir_name = '.'.join(('', appimagetool_name, 'appdir', _ARCH))
+    appdir = os.path.join(APPIMAGETOOL_DIR, appdir_name)
+    apprun = os.path.join(appdir, 'AppRun')
+
+    if dry or os.path.exists(apprun):
+        return apprun
     appimage = 'appimagetool-{0:}.AppImage'.format(_ARCH)
-    baseurl = 'https://github.com/AppImage/AppImageKit/releases/'              \
-              'download/13'
+
+    if APPIMAGETOOL_VERSION in map(str, range(1, 14)):
+        repository = 'AppImageKit'
+    else:
+        repository = 'appimagetool'
+    baseurl = os.path.join(
+        'https://github.com/AppImage',
+        repository,
+        'releases/download',
+        APPIMAGETOOL_VERSION
+    )
     log('INSTALL', 'appimagetool from %s', baseurl)
 
-    appdir_name = '.appimagetool.appdir'.format(_ARCH)
-    appdir = os.path.join(os.path.dirname(APPIMAGETOOL), appdir_name)
     if not os.path.exists(appdir):
         make_tree(os.path.dirname(appdir))
         with TemporaryDirectory() as tmpdir:
@@ -50,10 +69,7 @@ def ensure_appimagetool():
             system(('./' + appimage, '--appimage-extract'))
             copy_tree('squashfs-root', appdir)
 
-    if not os.path.exists(APPIMAGETOOL):
-        os.symlink(appdir_name + '/AppRun', APPIMAGETOOL)
-
-    return True
+    return apprun
 
 
 # Installers for dependencies
@@ -76,23 +92,18 @@ def ensure_patchelf():
     if os.path.exists(PATCHELF):
         return False
 
-    iarch = 'i386' if _ARCH == 'i686' else _ARCH
-    appimage = 'patchelf-{0:}.AppImage'.format(iarch)
-    baseurl = 'https://github.com/RanHuang/patchelf.appimage/releases/download'
+    tgz = '-'.join(('patchelf', PATCHELF_VERSION, _ARCH)) + '.tar.gz'
+    baseurl = 'https://github.com/NixOS/patchelf'
     log('INSTALL', 'patchelf from %s', baseurl)
-    # https://github.com/RanHuang/patchelf.appimage/releases/download/x86_64/patchelf-x86_64.AppImage
-    # https://github.com/RanHuang/patchelf.appimage/releases/download/aarch64/patchelf-aarch64.AppImage
 
     dirname = os.path.dirname(PATCHELF)
     patchelf = dirname + '/patchelf'
     make_tree(dirname)
     with TemporaryDirectory() as tmpdir:
-        download_url = os.path.join(baseurl, iarch, appimage)
-        log('INSTALL', 'Download from %s', download_url)
-        urlretrieve(download_url, appimage)
-        os.chmod(appimage, stat.S_IRWXU)
-        system(('./' + appimage, '--appimage-extract'))
-        copy_file('squashfs-root/usr/bin/patchelf', patchelf)
+        urlretrieve(os.path.join(baseurl, 'releases', 'download',
+                                 PATCHELF_VERSION, tgz), tgz)
+        system(('tar', 'xzf', tgz))
+        copy_file('bin/patchelf', patchelf)
     os.chmod(patchelf, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
 
     return True

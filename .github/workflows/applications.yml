@@ -21,16 +21,19 @@ on:
 
 jobs:
   Test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ['2.7', '3.7', '3.9']
+        version: ['3.9']
 
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.version }}
+
+    - name: Install Dependencies
+      run: pip install requests
 
     - name: Test scipy
       if: ${{ inputs.scipy }}
@@ -57,8 +60,9 @@ jobs:
         ./xonsh-x86_64.AppImage -c 'import xonsh'
 
     - name: Test ssh-mitm
-      if: ${{ inputs.ssh_mitm && (matrix.version == '3.9') }}
+      if: ${{ inputs.ssh-mitm }}
       run: |
-        python -m python_appimage build app applications/ssh-mitm
+        python -m python_appimage build app applications/ssh-mitm              \
+                                            --python-version=3.11
         test -e ssh-mitm-x86_64.AppImage
         ./ssh-mitm-x86_64.AppImage --help

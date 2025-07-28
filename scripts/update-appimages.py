@@ -16,9 +16,9 @@ from python_appimage.utils.manylinux import format_appimage_name, format_tag
 
 
 # Build matrix
-ARCHS = ('x86_64', 'i686')
+ARCHS = ('x86_64', 'i686', 'aarch64')
 MANYLINUSES = ('1', '2010', '2014', '2_24', '2_28')
-EXCLUDES = ('2_28_i686',)
+EXCLUDES = ('2_28_i686', '1_aarch64', '2010_aarch64')
 
 # Build directory for AppImages
 APPIMAGES_DIR = 'build-appimages'
@@ -202,7 +202,8 @@ def update(args):
         if new_assets:
             log('DRY', f'new update summary with {len(new_assets)} entries')
 
-        return
+        if not args.build:
+            return
 
     if new_assets:
         # Build new AppImage(s)
@@ -214,6 +215,9 @@ def update(args):
                 build_manylinux(meta.tag, meta.abi)
         finally:
             os.chdir(cwd)
+
+    if args.dry:
+        return
 
     # Create any new release(s).
     for tag in new_releases:
@@ -233,20 +237,30 @@ def update(args):
     for meta in new_assets:
         release = releases[meta.release_tag()].release
         appimage = meta.appimage_name()
-        new_asset = release.upload_asset(
-            path = f'{APPIMAGES_DIR}/{appimage}',
-            name = appimage
-        )
-        if meta.asset:
+        if meta.asset and (meta.asset.name == appimage):
             meta.asset.delete_asset()
             update_summary.append(
-                f'- update {meta.formated_tag()}/{meta.abi} '
-                    f'{meta.previous_version()} -> {meta.version}'
+                f'- update {meta.formated_tag()}/{meta.abi} {meta.version}'
+            )
+            new_asset = release.upload_asset(
+                path = f'{APPIMAGES_DIR}/{appimage}',
+                name = appimage
             )
         else:
-            update_summary.append(
-                f'- add {meta.formated_tag()}/{meta.abi} {meta.version}'
+            new_asset = release.upload_asset(
+                path = f'{APPIMAGES_DIR}/{appimage}',
+                name = appimage
             )
+            if meta.asset:
+                meta.asset.delete_asset()
+                update_summary.append(
+                    f'- update {meta.formated_tag()}/{meta.abi} '
+                        f'{meta.previous_version()} -> {meta.version}'
+                )
+            else:
+                update_summary.append(
+                    f'- add {meta.formated_tag()}/{meta.abi} {meta.version}'
+                )
 
         meta.asset = new_asset
         assets[meta.tag][meta.abi] = meta
@@ -295,10 +309,19 @@ if __name__ == '__main__':
         action = 'store_true',
         default = False
     )
+    parser.add_argument('-b', '--build',
+        help = 'build AppImages (in dry mode)',
+        action = 'store_true',
+        default = False
+    )
     parser.add_argument('-d', '--dry',
         help = 'dry run (only log changes)',
         action = 'store_true',
         default = False
+    )
+    parser.add_argument('-m', '--manylinux',
+        help = 'target specific manylinux tags',
+        nargs = "+"
     )
     parser.add_argument("-s", "--sha",
         help = "reference commit SHA"
@@ -308,5 +331,9 @@ if __name__ == '__main__':
     )
 
     args = parser.parse_args()
+
+    if args.manylinux:
+        MANYLINUSES = args.manylinux
+
     sys.argv = sys.argv[:1] # Empty args for fake call
     update(args)
